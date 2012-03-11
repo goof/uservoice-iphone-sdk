@@ -9,35 +9,31 @@
 #import <UIKit/UIKit.h>
 #import "UVStyleSheet.h"
 #import "UVDelegate.h"
+#import "UVConfig.h"
 
 @interface UserVoice : NSObject {
-
 }
 
-// Modally presents the UserVoice view and provides a way to exit the feedback
-// flow and return to the app.
-+ (void)presentUserVoiceModalViewControllerForParent:(UIViewController *)viewController 
-											 andSite:(NSString *)site
-											  andKey:(NSString *)key
-										   andSecret:(NSString *)secret;
+// Modally present the UserVoice interface
++ (void)presentUserVoiceInterfaceForParentViewController:(UIViewController *)parentViewController andConfig:(UVConfig *)config;
 
-+ (void)presentUserVoiceModalViewControllerForParent:(UIViewController *)viewController 
-											 andSite:(NSString *)site
-											  andKey:(NSString *)key
-										   andSecret:(NSString *)secret
-										 andSsoToken:(NSString *)token;
+// Modally present the UserVoice contact form
++ (void)presentUserVoiceContactUsFormForParentViewController:(UIViewController *)parentViewController andConfig:(UVConfig *)config;
 
-+ (void)presentUserVoiceModalViewControllerForParent:(UIViewController *)viewController 
-											 andSite:(NSString *)site
-											  andKey:(NSString *)key
-										   andSecret:(NSString *)secret
-											andEmail:(NSString *)email
-									  andDisplayName:(NSString *)displayName
-											 andGUID:(NSString *)guid;
+// Modally present the UserVoice interface, but go directly to the forum screen
++ (void)presentUserVoiceForumForParentViewController:(UIViewController *)parentViewController andConfig:(UVConfig *)config;
 
-+ (void)showUserVoice:(UIViewController *)rootViewController forController:(UIViewController *)viewController;
-
+// Set a <UVDelegate> to receive callbacks
 + (void)setDelegate:(id<UVDelegate>)delegate;
+
+// Get the current <UVDelegate>
 + (id<UVDelegate>)delegate;
+
+/**
+ * @deprecated Use [UserVoice presentUserVoiceModalInterfaceForParentViewController:andConfig:] instead.
+ */
++ (void)presentUserVoiceModalViewControllerForParent:(UIViewController *)viewController andSite:(NSString *)site andKey:(NSString *)key andSecret:(NSString *)secret;
++ (void)presentUserVoiceModalViewControllerForParent:(UIViewController *)viewController andSite:(NSString *)site andKey:(NSString *)key andSecret:(NSString *)secret andSsoToken:(NSString *)token;
++ (void)presentUserVoiceModalViewControllerForParent:(UIViewController *)viewController andSite:(NSString *)site andKey:(NSString *)key andSecret:(NSString *)secret andEmail:(NSString *)email andDisplayName:(NSString *)displayName andGUID:(NSString *)guid;
 
 @end

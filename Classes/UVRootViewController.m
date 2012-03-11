@@ -13,34 +13,30 @@
 #import "UVUser.h"
 #import "UVCustomField.h"
 #import "UVWelcomeViewController.h"
+#import "UVNewSuggestionViewController.h"
 #import "UVSuggestionListViewController.h"
 #import "UVNetworkUtils.h"
 #import "UVSuggestion.h"
+#import "UVConfig.h"
 #import "NSError+UVExtras.h"
+#include <QuartzCore/QuartzCore.h>
 
 @implementation UVRootViewController
 
-@synthesize ssoToken;
-@synthesize email, displayName, guid;
+@synthesize viewToLoad;
 
-- (void)setupErrorAlertViewDelegate {
-	errorAlertView.delegate = self;
+- (id)init {
+    if (self = [super init]) {
+        self.viewToLoad = @"welcome";
+    }
+    return self;
 }
 
-- (id)initWithSsoToken:(NSString *)aToken {
-	if ((self = [super init])) {
-		self.ssoToken = aToken;
-	}
-	return self;
-}
-
-- (id)initWithEmail:(NSString *)anEmail andGUID:(NSString *)aGUID andName:(NSString *)aDisplayName {
-	if ((self = [super init])) {
-		self.email = anEmail;
-		self.guid = aGUID;
-		self.displayName = aDisplayName;
-	}
-	return self;
+- (id)initWithViewToLoad:(NSString *)theViewToLoad {
+    if (self = [super init]) {
+        self.viewToLoad = theViewToLoad;
+    }
+    return self;
 }
 
 - (void)didReceiveError:(NSError *)error {
@@ -49,7 +45,11 @@
 			[[UVSession currentSession].currentToken remove];
 			[UVToken getRequestTokenWithDelegate:self];
 		} else {
-			[self showErrorAlertViewWithMessage:@"This application didn't configure UserVoice properly"];
+            [[[[UIAlertView alloc] initWithTitle:NSLocalizedStringFromTable(@"Error", @"UserVoice", nil)
+                                         message:NSLocalizedStringFromTable(@"This application didn't configure UserVoice properly", @"UserVoice", nil)
+                                        delegate:self
+                               cancelButtonTitle:nil
+                               otherButtonTitles:NSLocalizedStringFromTable(@"OK", @"UserVoice", nil), nil] autorelease] show];
 		}
 	} else {
 		[super didReceiveError:error];
@@ -60,13 +60,21 @@
 	[self dismissUserVoice];
 }
 
-- (void)pushWelcomeView {
+- (void)pushNextView {
     UVSession *session = [UVSession currentSession];
     if ((![UVToken exists] || session.user) && session.clientConfig && [self.navigationController.viewControllers count] == 1) {
-        self.navigationController.navigationBarHidden = NO;
-        UVWelcomeViewController *welcomeView = [[UVWelcomeViewController alloc] init];
-        [self.navigationController pushViewController:welcomeView animated:YES];
-        [welcomeView release];
+        if (self.viewToLoad == @"welcome") {
+            self.navigationController.navigationBarHidden = NO;
+            UVWelcomeViewController *welcomeView = [[UVWelcomeViewController alloc] init];
+            [self.navigationController pushViewController:welcomeView animated:YES];
+            [welcomeView release];
+        } else if (self.viewToLoad == @"suggestions") {
+            self.navigationController.navigationBarHidden = NO;
+            UIViewController *welcomeViewController = [[[UVWelcomeViewController alloc] init] autorelease];
+            UIViewController *suggestionListViewController = [[[UVSuggestionListViewController alloc] initWithForum:[UVSession currentSession].clientConfig.forum] autorelease];
+            NSArray *viewControllers = [NSArray arrayWithObjects:welcomeViewController, suggestionListViewController, nil];
+            [self.navigationController setViewControllers:viewControllers animated:YES];
+        }
     }
 }
 
@@ -75,10 +83,10 @@
 	[UVSession currentSession].currentToken = token;
 	
 	// check if we have a sso token and if so exchange it for an access token and user
-	if (self.ssoToken != nil) {
-		[UVUser findOrCreateWithSsoToken:self.ssoToken delegate:self];
-	} else if (self.email != nil) {
-		[UVUser findOrCreateWithGUID:self.guid andEmail:self.email andName:self.displayName andDelegate:self];
+	if ([UVSession currentSession].config.ssoToken != nil) {
+		[UVUser findOrCreateWithSsoToken:[UVSession currentSession].config.ssoToken delegate:self];
+	} else if ([UVSession currentSession].config.email != nil) {
+		[UVUser findOrCreateWithGUID:[UVSession currentSession].config.guid andEmail:[UVSession currentSession].config.email andName:[UVSession currentSession].config.displayName andDelegate:self];
 	} else {
 		[UVClientConfig getWithDelegate:self];
 	}
@@ -98,7 +106,7 @@
 	if ([UVSession currentSession].clientConfig.ticketsEnabled) {
         [UVCustomField getCustomFieldsWithDelegate:self];
     } else {
-        [self pushWelcomeView];
+        [self pushNextView];
     }
 }
 
@@ -110,13 +118,13 @@
 
 - (void)didRetrieveCustomFields:(id)theFields {
     [UVSession currentSession].clientConfig.customFields = [[[NSArray alloc] initWithArray:theFields] autorelease];
-    [self pushWelcomeView];
+    [self pushNextView];
 }
 
 - (void) didRetrieveUserSuggestions:(NSArray *) theSuggestions {
     UVUser *user = [UVSession currentSession].user;
     [user didLoadSuggestions:theSuggestions];
-    [self pushWelcomeView];
+    [self pushNextView];
 }
 
 #pragma mark ===== Basic View Methods =====
@@ -139,9 +147,20 @@
 	splashLabel2.font = [UIFont systemFontOfSize:15];
 	splashLabel2.textColor = [UIColor darkGrayColor];
 	splashLabel2.textAlignment = UITextAlignmentCenter;
-	splashLabel2.text = @"Connecting to UserVoice";
+	splashLabel2.text = NSLocalizedStringFromTable(@"Connecting to UserVoice", @"UserVoice", nil);
 	[contentView addSubview:splashLabel2];
 	[splashLabel2 release];
+    
+    UIButton *cancelButton = [[UIButton alloc] initWithFrame:CGRectMake((screenWidth-80)/2, (screenHeight/2)+40, 80, 20)];
+    [cancelButton setTitle:NSLocalizedStringFromTable(@"Cancel", @"UserVoice", nil) forState:UIControlStateNormal];
+    cancelButton.titleLabel.font = [UIFont systemFontOfSize:12];
+    cancelButton.titleLabel.textColor = [UIColor darkGrayColor];
+    cancelButton.backgroundColor = [UIColor colorWithRed:0.9 green:0.9 blue:0.9 alpha:1.0];
+    cancelButton.layer.cornerRadius = 6.0;
+    [cancelButton addTarget:self action:@selector(dismissUserVoice) forControlEvents:UIControlEventTouchUpInside];
+    [contentView addSubview:cancelButton];
+    [cancelButton release];
+
 		
 	UIActivityIndicatorView *activity = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleWhiteLarge];
 	activity.center = CGPointMake(screenWidth/2, (screenHeight/ 2) - 60);
@@ -160,6 +179,9 @@
 		UIImageView *serverErrorImage = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"uv_error_connection.png"]];
 		self.navigationController.navigationBarHidden = NO;
 		serverErrorImage.frame = self.view.frame;
+        serverErrorImage.contentMode = UIViewContentModeCenter;
+        serverErrorImage.backgroundColor = [UIColor colorWithRed:0.78f green:0.80f blue:0.83f alpha:1.0f];
+        serverErrorImage.clipsToBounds = YES;
 		[self.view addSubview:serverErrorImage];
 		[serverErrorImage release];
 	} else if (![UVToken exists]) {
@@ -181,7 +203,7 @@
 		NSLog(@"Already loaded");
 		// We already have a client config, because the user already logged in before during
 		// this session. Skip straight to the welcome view.
-		[self pushWelcomeView];
+		[self pushNextView];
 	}
 }
 
@@ -191,10 +213,7 @@
 }
 
 - (void)dealloc {
-	self.ssoToken = nil;
-	self.email = nil;
-	self.guid = nil;
-	self.displayName = nil;
+    self.viewToLoad = nil;
     [super dealloc];
 }
 

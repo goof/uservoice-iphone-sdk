@@ -12,80 +12,65 @@
 #import "UVWelcomeViewController.h"
 #import "UVRootViewController.h"
 #import "UVSession.h"
+#import "UVNewTicketViewController.h"
+#import "UVSuggestionListViewController.h"
 
 @implementation UserVoice
 
-+ (void)presentUserVoiceModalViewControllerForParent:(UIViewController *)viewController 
-											 andSite:(NSString *)site
-											  andKey:(NSString *)key
-										   andSecret:(NSString *)secret {
-	[UVSession currentSession].config = [[[UVConfig alloc] initWithSite:site andKey:key andSecret:secret] autorelease];
- 	
-	UIViewController *rootViewController;
-	if ([[UVSession currentSession] clientConfig])
-	{
-		rootViewController = [[[UVWelcomeViewController alloc] init] autorelease];
-	}
-	else
-	{
-		rootViewController = [[[UVRootViewController alloc] init] autorelease];
-	}
-	
-	// Capture the launch orientation, then store it in NSDefaults for reference in all other UV view controller classes
-	[UVClientConfig setOrientation];
-	
-	[self showUserVoice:rootViewController forController:viewController];
-}
-
-+ (void)presentUserVoiceModalViewControllerForParent:(UIViewController *)viewController 
-											 andSite:(NSString *)site
-											  andKey:(NSString *)key
-										   andSecret:(NSString *)secret
-										 andSsoToken:(NSString *)token {
-	[UVSession currentSession].config = [[[UVConfig alloc] initWithSite:site andKey:key andSecret:secret] autorelease];
-	
-	// always use the sso token to ensure details are updated	
-	UIViewController *rootViewController;
-    rootViewController = [[[UVRootViewController alloc] initWithSsoToken:token] autorelease];
-	
-	// Capture the launch orientation, then store it in NSDefaults for reference in all other UV view controller classes
-	[UVClientConfig setOrientation];
-	
-	[self showUserVoice:rootViewController forController:viewController];
-}
-
-+ (void)presentUserVoiceModalViewControllerForParent:(UIViewController *)viewController 
-											 andSite:(NSString *)site
-											  andKey:(NSString *)key
-										   andSecret:(NSString *)secret
-											andEmail:(NSString *)email
-									  andDisplayName:(NSString *)displayName
-											 andGUID:(NSString *)guid {
-	[UVSession currentSession].config = [[[UVConfig alloc] initWithSite:site andKey:key andSecret:secret] autorelease];
-	
-	UIViewController *rootViewController;
-	if ([[UVSession currentSession] clientConfig])
-	{
-		rootViewController = [[[UVWelcomeViewController alloc] init] autorelease];
-	}
-	else
-	{
-		rootViewController = [[[UVRootViewController alloc] initWithEmail:email 
-																  andGUID:guid 
-																  andName:displayName] autorelease];
-	}
-	
-	// Capture the launch orientation, then store it in NSDefaults for reference in all other UV view controller classes
-	[UVClientConfig setOrientation];
-	
-	[self showUserVoice:rootViewController forController:viewController];
-	
-}
-
-+ (void)showUserVoice:(UIViewController *)rootViewController forController:(UIViewController *)viewController {
++ (void) presentUserVoiceControllers:(NSArray *)viewControllers forParentViewController:(UIViewController *)parentViewController withConfig:(UVConfig *)config {
+    [UVSession currentSession].config = config;
 	[UVSession currentSession].isModal = YES;
-	UINavigationController *userVoiceNav = [[[UINavigationController alloc] initWithRootViewController:rootViewController] autorelease];
-	[viewController presentModalViewController:userVoiceNav animated:YES];
+    // Capture the launch orientation, then store it in NSDefaults for reference in all other UV view controller classes
+    [UVClientConfig setOrientation];
+	UINavigationController *navigationController = [[[UINavigationController alloc] init] autorelease];
+    navigationController.viewControllers = viewControllers;
+	[parentViewController presentModalViewController:navigationController animated:YES];
+}
+
++ (void) presentUserVoiceController:(UIViewController *)viewController forParentViewController:(UIViewController *)parentViewController withConfig:(UVConfig *)config {
+    [self presentUserVoiceControllers:[NSArray arrayWithObject:viewController] forParentViewController:parentViewController withConfig:config];
+}
+
+
++ (void)presentUserVoiceModalViewControllerForParent:(UIViewController *)parentViewController andSite:(NSString *)site andKey:(NSString *)key andSecret:(NSString *)secret {
+    UVConfig *config = [[[UVConfig alloc] initWithSite:site andKey:key andSecret:secret] autorelease];
+    [self presentUserVoiceInterfaceForParentViewController:parentViewController andConfig:config];
+}
+
++ (void)presentUserVoiceModalViewControllerForParent:(UIViewController *)parentViewController andSite:(NSString *)site andKey:(NSString *)key andSecret:(NSString *)secret andSsoToken:(NSString *)token {
+    UVConfig *config = [[[UVConfig alloc] initWithSite:site andKey:key andSecret:secret andSSOToken:token] autorelease];
+    [self presentUserVoiceInterfaceForParentViewController:parentViewController andConfig:config];
+}
+
++ (void)presentUserVoiceModalViewControllerForParent:(UIViewController *)parentViewController andSite:(NSString *)site andKey:(NSString *)key andSecret:(NSString *)secret andEmail:(NSString *)email andDisplayName:(NSString *)displayName andGUID:(NSString *)guid {
+    UVConfig *config = [[[UVConfig alloc] initWithSite:site andKey:key andSecret:secret andEmail:email andDisplayName:displayName andGUID:guid] autorelease];
+    [self presentUserVoiceInterfaceForParentViewController:parentViewController andConfig:config];
+}
+
++ (void)presentUserVoiceInterfaceForParentViewController:(UIViewController *)parentViewController andConfig:(UVConfig *)config {
+    UIViewController *viewController;
+    if ([[UVSession currentSession] clientConfig])
+        viewController = [[[UVWelcomeViewController alloc] init] autorelease];
+    else
+        viewController = [[[UVRootViewController alloc] init] autorelease];
+    [self presentUserVoiceController:viewController forParentViewController:parentViewController withConfig:config];
+}
+
++ (void)presentUserVoiceContactUsFormForParentViewController:(UIViewController *)parentViewController andConfig:(UVConfig *)config {
+    UIViewController *viewController = [[[UVNewTicketViewController alloc] initWithoutNavigation] autorelease];
+	[self presentUserVoiceController:viewController forParentViewController:parentViewController withConfig:config];
+}
+
++ (void)presentUserVoiceForumForParentViewController:(UIViewController *)parentViewController andConfig:(UVConfig *)config {
+    if ([[UVSession currentSession] clientConfig]) {
+        UIViewController *welcomeViewController = [[[UVWelcomeViewController alloc] init] autorelease];
+        UIViewController *suggestionListViewController = [[[UVSuggestionListViewController alloc] initWithForum:[UVSession currentSession].clientConfig.forum] autorelease];
+        NSArray *viewControllers = [NSArray arrayWithObjects:welcomeViewController, suggestionListViewController, nil];
+        [self presentUserVoiceControllers:viewControllers forParentViewController:parentViewController withConfig:config];
+    } else {
+        UIViewController *viewController = [[[UVRootViewController alloc] initWithViewToLoad:@"suggestions"] autorelease];
+        [self presentUserVoiceController:viewController forParentViewController:parentViewController withConfig:config];
+    }
 }
 
 static id<UVDelegate> userVoiceDelegate;
